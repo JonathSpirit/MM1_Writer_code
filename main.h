@@ -19,7 +19,10 @@ sbit SRCLK = P2^4;
 sbit RCLK = P2^5;
 
 void Sleep(unsigned int ms);
+
 unsigned char StringToUint8(unsigned char* str);
 unsigned long StringToUint24(unsigned char* str);
+
+void Uint8ToString(unsigned char* str, unsigned char uint8);
 
 #endif //_MAIN_H_INCLUDED_

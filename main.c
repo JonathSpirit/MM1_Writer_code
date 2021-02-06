@@ -19,6 +19,8 @@ void main()
     unsigned char numOfData;
     unsigned long startAddress;
     
+    unsigned char buffRead;
+    
     xdata unsigned char dataArray[100];
     
     //Init
@@ -155,18 +157,68 @@ void main()
                     }
                 }
                 else if ( !strncmp("$R", _uart_receiveData, 2) )
-                {//TODO read
-                    /*SetOutputEnable(0);
-                    for (i=0; i<sizeof(dataArray); ++i)
+                {//Read command, read data on the memory
+                    /*
+                    [$R][Start address 24bit][Num of data 24bit][#]
+                    $R  xxxxxxxx             xxxxxxxx           #
+                    2   8                    8
+                    18 size
+                    
+                    return
+                    [READED][Data checksum 8bit][n data 8bit] ... [\n]
+                    READED  xxx                 xxx           ... \n
+                    6       3                   n*3
+                    9+n*3 size
+                    */
+                    if (_uart_receiveSize == 18)
                     {
-                        SetAddress(i);
-                        if ( Read() != i )
-                        {
-                            error = 1;
-                            break;
+                        numOfData = StringToUint24(_uart_receiveData+10);
+                        startAddress = StringToUint24(_uart_receiveData+2);
+                        
+                        if ( (numOfData<=100) && (numOfData!=0) && (startAddress+numOfData-1 <= 0x00FFFFFF) )
+                        {//Check if arguments is good
+                            checksumCalculated = 0;
+                            strcpy(_uart_transmitData, "READEDxxx");
+                            ptr = _uart_transmitData+9;
+                            
+                            SetOutputEnable(0);
+                            for (i=0; i<numOfData; ++i)
+                            {
+                                SetAddress(startAddress+i);
+                                Sleep(1);
+                                
+                                buffRead = Read();
+                                checksumCalculated += buffRead;
+                                Uint8ToString(ptr, buffRead);
+                                ptr+=3;
+                            }
+                            //Set checksum
+                            Uint8ToString(_uart_transmitData+6, checksumCalculated);
+                            *ptr = '\n'; //lastChar;
+                            
+                            _uart_transmitSize = 10+numOfData*3;
                         }
-                        Sleep(5);
-                    }*/
+                        else
+                        {
+                            /*
+                            return
+                            [BAD_SIZE][\n]
+                            9 size
+                            */
+                            strcpy(_uart_transmitData, "BAD_SIZE\n");
+                            _uart_transmitSize = 9;
+                        }
+                    }
+                    else
+                    {
+                        /*
+                        return
+                        [BAD_SIZE][\n]
+                        9 size
+                        */
+                        strcpy(_uart_transmitData, "BAD_SIZE\n");
+                        _uart_transmitSize = 9;
+                    }
                 }
                 else
                 {
@@ -215,6 +267,14 @@ void Sleep(unsigned int ms)
     
     SFRPAGE = LEGACY_PAGE;
     EA = 1; //Reactivate interrupt
+}
+
+void Uint8ToString(unsigned char* str, unsigned char uint8)
+{
+    //xxx
+    str[0] = (uint8/100)+'0';
+    str[1] = (uint8%100)/10+'0';
+    str[2] = (uint8%10)+'0';
 }
 
 unsigned char StringToUint8(unsigned char* str)

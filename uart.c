@@ -6,15 +6,15 @@ Copyright 2021 Guillaume Guillet
 #include "config.h"
 
 xdata unsigned char _uart_receiveData[UART_RECEIVE_SIZE];
-unsigned char _uart_receiveSize=0;
+unsigned short _uart_receiveSize=0;
 bit _uart_receiveFlag=0;
 
-unsigned char _uart_transmitData[UART_TRANSMIT_SIZE];
-unsigned char _uart_transmitSize=0;
+xdata unsigned char _uart_transmitData[UART_TRANSMIT_SIZE];
+unsigned short _uart_transmitSize=0;
 bit _uart_transmitFlag=0;
 
-unsigned char _receiveCounter = 0;
-unsigned char _transmitCounter = 0;
+unsigned short _receiveCounter = 0;
+unsigned short _transmitCounter = 0;
 
 unsigned char _timeoutCounter = 0;
 
