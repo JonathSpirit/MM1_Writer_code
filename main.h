@@ -8,6 +8,8 @@ Licensed under MIT License
 
 #include "config.h"
 
+#define REVISION 2
+
 #define MEMDATA P1
 #define MEMDATA_PORT P1MDOUT
 

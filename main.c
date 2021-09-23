@@ -15,6 +15,7 @@ Revision 2:
     - add macro BEGIN_TRANSMISSION_AND_WAIT
     - add Uint24ToString
     - read command now return the start address
+    - add $I command (info), that will return code information
 
 Revision 1:
     - Initial release
@@ -77,6 +78,31 @@ void main()
                     */
                     
                     TransmitCString("HELLO\n");
+                }
+                else if ( !strncmp("$I", _uart_receiveData, _uart_receiveSize) )
+                {//Info command, return code information
+                    /*
+                    [$I][#]
+                    2 size
+                    
+                    return (every information is separate with ':' and a '=' is used for arguement)
+                    ... [\n]
+                    n size
+                    */
+                    
+                    _uart_transmitSize = 0;
+                    
+                    CopyCStringToTransmitBuffer("Name=MM1_Writer_code:REV=");
+                    Uint8ToString(_uart_transmitData+_uart_transmitSize, REVISION);
+                    _uart_transmitSize += 3;
+                    
+                    CopyCStringToTransmitBuffer(":CompileDate=");
+                    CopyCStringToTransmitBuffer(__DATE__);
+                    
+                    CopyCStringToTransmitBuffer(":CompileTime=");
+                    CopyCStringToTransmitBuffer(__TIME__);
+                    
+                    BEGIN_TRANSMISSION_AND_WAIT
                 }
                 else if ( !strncmp("$W", _uart_receiveData, 2) )
                 {//Write command, write data on the memory
