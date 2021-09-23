@@ -1,5 +1,21 @@
 /*
 Copyright 2021 Guillaume Guillet
+Licensed under MIT License
+Revision 2
+
+Code:  https://github.com/JonathSpirit/MM1_Writer_code
+Board: https://github.com/JonathSpirit/MM1_Writer
+*/
+
+/* CHANGELOG
+Revision 2:
+    - add cstring function to help
+        - add TransmitCString
+        - add CopyCStringToTransmitBuffer
+    - add macro BEGIN_TRANSMISSION_AND_WAIT
+
+Revision 1:
+    - Initial release
 */
 
 #include "main.h"
