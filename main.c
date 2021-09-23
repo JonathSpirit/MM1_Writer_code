@@ -57,13 +57,8 @@ void main()
                     [HELLO][\n]
                     6 size
                     */
-                    _uart_transmitData[0] = 'H';
-                    _uart_transmitData[1] = 'E';
-                    _uart_transmitData[2] = 'L';
-                    _uart_transmitData[3] = 'L';
-                    _uart_transmitData[4] = 'O';
-                    _uart_transmitData[5] = '\n';
-                    _uart_transmitSize = 6;
+                    
+                    TransmitCString("HELLO\n");
                 }
                 else if ( !strncmp("$W", _uart_receiveData, 2) )
                 {//Write command, write data on the memory
@@ -109,8 +104,7 @@ void main()
                                     [WRITED][\n]
                                     7 size
                                     */
-                                    strcpy(_uart_transmitData, "WRITED\n");
-                                    _uart_transmitSize = 7;
+                                    TransmitCString("WRITED\n");
                                 }
                                 else
                                 {
@@ -119,8 +113,7 @@ void main()
                                     [BAD_CHECKSUM][\n]
                                     13 size
                                     */
-                                    strcpy(_uart_transmitData, "BAD_CHECKSUM\n");
-                                    _uart_transmitSize = 13;
+                                    TransmitCString("BAD_CHECKSUM\n");
                                 }
                             }
                             else
@@ -130,8 +123,7 @@ void main()
                                 [BAD_SIZE][\n]
                                 9 size
                                 */
-                                strcpy(_uart_transmitData, "BAD_SIZE\n");
-                                _uart_transmitSize = 9;
+                                TransmitCString("BAD_SIZE\n");
                             }
                         }
                         else
@@ -141,8 +133,7 @@ void main()
                             [BAD_SIZE][\n]
                             9 size
                             */
-                            strcpy(_uart_transmitData, "BAD_SIZE\n");
-                            _uart_transmitSize = 9;
+                            TransmitCString("BAD_SIZE\n");
                         }
                     }
                     else
@@ -152,8 +143,7 @@ void main()
                         [BAD_SIZE][\n]
                         9 size
                         */
-                        strcpy(_uart_transmitData, "BAD_SIZE\n");
-                        _uart_transmitSize = 9;
+                        TransmitCString("BAD_SIZE\n");
                     }
                 }
                 else if ( !strncmp("$R", _uart_receiveData, 2) )
@@ -178,8 +168,7 @@ void main()
                         if ( (numOfData<=100) && (numOfData!=0) && (startAddress+numOfData-1 <= 0x00FFFFFF) )
                         {//Check if arguments is good
                             checksumCalculated = 0;
-                            strcpy(_uart_transmitData, "READEDxxx");
-                            ptr = _uart_transmitData+9;
+                            ptr = _uart_transmitData + CopyCStringToTransmitBuffer("READEDxxx");
                             
                             SetOutputEnable(0);
                             for (i=0; i<numOfData; ++i)
@@ -197,6 +186,7 @@ void main()
                             *ptr = '\n'; //lastChar;
                             
                             _uart_transmitSize = 10+numOfData*3;
+                            BEGIN_TRANSMISSION_AND_WAIT
                         }
                         else
                         {
@@ -205,8 +195,7 @@ void main()
                             [BAD_SIZE][\n]
                             9 size
                             */
-                            strcpy(_uart_transmitData, "BAD_SIZE\n");
-                            _uart_transmitSize = 9;
+                            TransmitCString("BAD_SIZE\n");
                         }
                     }
                     else
@@ -216,8 +205,7 @@ void main()
                         [BAD_SIZE][\n]
                         9 size
                         */
-                        strcpy(_uart_transmitData, "BAD_SIZE\n");
-                        _uart_transmitSize = 9;
+                        TransmitCString("BAD_SIZE\n");
                     }
                 }
                 else
@@ -227,8 +215,7 @@ void main()
                     [UNKNOWN][\n]
                     8 size
                     */
-                    strcpy(_uart_transmitData, "UNKNOWN\n");
-                    _uart_transmitSize = 8;
+                    TransmitCString("UNKNOWN\n");
                 }
             }
             else
@@ -238,15 +225,10 @@ void main()
                 [BAD_SIZE][\n]
                 9 size
                 */
-                strcpy(_uart_transmitData, "BAD_SIZE\n");
-                _uart_transmitSize = 9;
+                TransmitCString("BAD_SIZE\n");
             }
             
             _uart_receiveFlag = 0;
-            
-            TI0 = 1;
-            _uart_transmitFlag = 0;
-            while (!_uart_transmitFlag);
         }
     }
 }

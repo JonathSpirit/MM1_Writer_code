@@ -4,6 +4,7 @@ Copyright 2021 Guillaume Guillet
 
 #include "uart.h"
 #include "config.h"
+//#include <string.h>
 
 xdata unsigned char _uart_receiveData[UART_RECEIVE_SIZE];
 unsigned short _uart_receiveSize=0;
@@ -26,6 +27,7 @@ void UART_control() interrupt UART0_INTERRUPT
     {//Reception
         RI0=0;
         
+        //Blocks the reception if the program has not had time to process the other message
         if (!_uart_receiveFlag)
         {
             if (_receiveCounter >= UART_RECEIVE_SIZE)
@@ -96,4 +98,28 @@ void UART_timeout() interrupt TIMER0_INTERRUPT
     {
         TR0 = 1;
     }
+}
+
+void TransmitCString(const char* cstr)
+{
+    _uart_transmitSize = 0;
+    while ( cstr[_uart_transmitSize] != '\0' )
+    {
+        _uart_transmitData[_uart_transmitSize] = cstr[_uart_transmitSize];
+        ++_uart_transmitSize;
+    }
+   
+    BEGIN_TRANSMISSION_AND_WAIT
+}
+
+unsigned short CopyCStringToTransmitBuffer(const char* cstr)
+{
+    unsigned short strIndex = 0;
+    while ( cstr[strIndex] != '\0' )
+    {
+        _uart_transmitData[_uart_transmitSize] = cstr[strIndex];
+        ++_uart_transmitSize;
+        ++strIndex;
+    }
+    return strIndex;
 }
