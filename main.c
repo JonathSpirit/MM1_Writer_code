@@ -13,6 +13,8 @@ Revision 2:
         - add TransmitCString
         - add CopyCStringToTransmitBuffer
     - add macro BEGIN_TRANSMISSION_AND_WAIT
+    - add Uint24ToString
+    - read command now return the start address
 
 Revision 1:
     - Initial release
@@ -171,10 +173,10 @@ void main()
                     18 size
                     
                     return
-                    [READED][Data checksum 8bit][n data 8bit] ... [\n]
-                    READED  xxx                 xxx           ... \n
-                    6       3                   n*3
-                    9+n*3 size
+                    [READED][Data checksum 8bit][Start address 24bit][n data 8bit] ... [\n]
+                    READED  xxx                 xxxxxxxx             xxx           ... \n
+                    6       3                   8                    n*3
+                    9+8+n*3 size
                     */
                     if (_uart_receiveSize == 18)
                     {
@@ -185,6 +187,8 @@ void main()
                         {//Check if arguments is good
                             checksumCalculated = 0;
                             ptr = _uart_transmitData + CopyCStringToTransmitBuffer("READEDxxx");
+                            Uint24ToString(ptr, startAddress);
+                            ptr+=8;
                             
                             SetOutputEnable(0);
                             for (i=0; i<numOfData; ++i)
@@ -201,7 +205,7 @@ void main()
                             Uint8ToString(_uart_transmitData+6, checksumCalculated);
                             *ptr = '\n'; //lastChar;
                             
-                            _uart_transmitSize = 10+numOfData*3;
+                            _uart_transmitSize = 18+numOfData*3;
                             BEGIN_TRANSMISSION_AND_WAIT
                         }
                         else
@@ -274,13 +278,23 @@ void Uint8ToString(unsigned char* str, unsigned char uint8)
     str[1] = (uint8%100)/10+'0';
     str[2] = (uint8%10)+'0';
 }
+void Uint24ToString(unsigned char* str, unsigned long uint24)
+{
+    //xx'xxx'xxx
+    unsigned char i;
+    
+    for (i=0; i<8; ++i)
+    {
+        str[7-i] = (uint24%10)+'0';
+        uint24 /= 10;
+    }
+}
 
 unsigned char StringToUint8(unsigned char* str)
 {
     //xxx
     return (str[0]-'0')*100 + (str[1]-'0')*10 + (str[2]-'0');
 }
-
 unsigned long StringToUint24(unsigned char* str)
 {
     //xx'xxx'xxx

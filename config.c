@@ -1,5 +1,6 @@
 /*
 Copyright 2021 Guillaume Guillet
+Licensed under MIT License
 */
 
 #include "config.h"

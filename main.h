@@ -1,5 +1,6 @@
 /*
 Copyright 2021 Guillaume Guillet
+Licensed under MIT License
 */
 
 #ifndef _MAIN_H_INCLUDED_
@@ -24,5 +25,6 @@ unsigned char StringToUint8(unsigned char* str);
 unsigned long StringToUint24(unsigned char* str);
 
 void Uint8ToString(unsigned char* str, unsigned char uint8);
+void Uint24ToString(unsigned char* str, unsigned long uint24);
 
 #endif //_MAIN_H_INCLUDED_
