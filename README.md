@@ -54,6 +54,8 @@ The board is configured like so : 9600baud, no parity, 1 stop bit.
 Every command/response is in ascii. A command begin with '$' and must end with '#' (no line feed or carriage return).
 A response end with a line feed.
 
+Checksum is calculated by additioning every data byte (8bit).
+
 ### Commands
 Here is the commands list (you can find more detail in the source code):
 
@@ -79,3 +81,13 @@ Read command, read data on the memory
 | -------------------------------------------------- | -------------------------------------------------------------------------- |
 | [$R] [Start address 24bit] [Num of data 24bit] [#] | [READED] [Data checksum 8bit] [Start address 24bit] [n data 8bit] ... [\n] |
 
+Memory model command (flash, eeprom etc...), return saved memory model\
+(0: eeprom, 1:flash, default: eeprom)
+| Command                | Response           |
+| ---------------------- | ------------------ |
+| [$M] [1 data 8bit] [#] | [1 data 8bit] [\n] |
+
+Flash erase sector command, return start and count
+| Command                                            | Response                                              |
+| -------------------------------------------------- | ----------------------------------------------------- |
+| [$FES] [Start sector 8bit] [Sector count 8bit] [#] | [ERASED] [Start sector 8bit] [Sector count 8bit] [\n] |
