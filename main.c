@@ -16,6 +16,8 @@ Revision 2:
     - add Uint24ToString
     - read command now return the start address
     - add $I command (info), that will return code information
+    - add flash memory compatibility
+    - add $M command to set memory model (flash, eeprom, etc...)
 
 Revision 1:
     - Initial release
@@ -36,9 +38,12 @@ void main()
     unsigned char checksumCalculated;
     
     unsigned char numOfData;
+    unsigned char startSector;
     unsigned long startAddress;
     
     unsigned char buffRead;
+    
+    unsigned char memoryModel = MEMM_EEPROM;
     
     xdata unsigned char dataArray[100];
     
@@ -78,6 +83,107 @@ void main()
                     */
                     
                     TransmitCString("HELLO\n");
+                }
+                else if ( !strncmp("$M", _uart_receiveData, 2) )
+                {//Memory model command (flash, eeprom etc...), return saved memory model
+                    /*
+                    [$M] [1 data 8bit] [#]
+                    3 size
+                    
+                    return
+                    [1 data 8bit] [\n]
+                    1 size
+                    */
+                    
+                    if (_uart_receiveSize == 3)
+                    {
+                        i = _uart_receiveData[2] - '0';
+                        if (i < _MEMM_SIZE)
+                        {
+                            memoryModel = i;
+                        }
+                        _uart_transmitSize = 2;
+                        _uart_transmitData[0] = memoryModel+'0';
+                        _uart_transmitData[1] = '\n';
+                        BEGIN_TRANSMISSION_AND_WAIT
+                    }
+                    else
+                    {
+                        /*
+                        return
+                        [BAD_SIZE][\n]
+                        9 size
+                        */
+                        TransmitCString("BAD_SIZE\n");
+                    }
+                }
+                else if ( !strncmp("$FES", _uart_receiveData, 4) )
+                {//Flash erase sector command, return start and count
+                    /*
+                    [$FES] [Start sector 8bit] [Sector count 8bit] [#]
+                    $FES   xxx                 xxx                 #
+                    4      3                   3
+                    10 size
+                    
+                    return
+                    [ERASED] [Start sector 8bit] [Sector count 8bit] [\n]
+                    12 size
+                    */
+                    
+                    if (_uart_receiveSize == 10)
+                    {
+                        numOfData = StringToUint8(_uart_receiveData+7);
+                        startSector = StringToUint8(_uart_receiveData+4);
+                        
+                        if (numOfData > 0)
+                        {
+                            if ( ((unsigned short)startSector) + numOfData <= 0xFF )
+                            {
+                                SetOutputEnable(1);
+                                
+                                for (i=0; i<numOfData; ++i)
+                                {
+                                    FlashEraseSector(startSector + i);
+                                }
+                                
+                                _uart_transmitSize = 0;
+                                CopyCStringToTransmitBuffer("ERASED");
+                                Uint8ToString(_uart_transmitData+_uart_transmitSize, startSector);
+                                _uart_transmitSize += 3;
+                                Uint8ToString(_uart_transmitData+_uart_transmitSize, numOfData);
+                                _uart_transmitSize += 3;
+                                _uart_transmitData[_uart_transmitSize++] = '\n';
+                                BEGIN_TRANSMISSION_AND_WAIT
+                            }
+                            else
+                            {
+                                /*
+                                return
+                                [BAD_SIZE][\n]
+                                9 size
+                                */
+                                TransmitCString("BAD_SIZE\n");
+                            }
+                        }
+                        else
+                        {
+                            /*
+                            return
+                            [BAD_SIZE][\n]
+                            9 size
+                            */
+                            TransmitCString("BAD_SIZE\n");
+                        }
+                    }
+                    else
+                    {
+                        /*
+                        return
+                        [BAD_SIZE][\n]
+                        9 size
+                        */
+                        TransmitCString("BAD_SIZE\n");
+                    }
                 }
                 else if ( !strncmp("$I", _uart_receiveData, _uart_receiveSize) )
                 {//Info command, return code information
@@ -136,11 +242,22 @@ void main()
                                     //Everything is ok ! Begin the writing !
                                     SetOutputEnable(1);
                     
-                                    for (i=0; i<numOfData; ++i)
+                                    switch (memoryModel)
                                     {
-                                        SetAddress(startAddress + i);
-                                        Write(dataArray[i]);
-                                        Sleep(20);
+                                    case MEMM_FLASH:
+                                        for (i=0; i<numOfData; ++i)
+                                        {
+                                            FlashByteProgram(startAddress + i, dataArray[i]);
+                                        }
+                                        break;
+                                    default:
+                                        for (i=0; i<numOfData; ++i)
+                                        {
+                                            SetAddress(startAddress + i);
+                                            Write(dataArray[i]);
+                                            Sleep(20);
+                                        }
+                                        break;
                                     }
                                     
                                     /*
@@ -211,6 +328,7 @@ void main()
                         
                         if ( (numOfData<=100) && (numOfData!=0) && (startAddress+numOfData-1 <= 0x00FFFFFF) )
                         {//Check if arguments is good
+                            _uart_transmitSize = 0;
                             checksumCalculated = 0;
                             ptr = _uart_transmitData + CopyCStringToTransmitBuffer("READEDxxx");
                             Uint24ToString(ptr, startAddress);
