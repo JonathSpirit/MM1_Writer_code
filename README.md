@@ -39,13 +39,55 @@ This is the uc code for the project [MM1_Writer](https://github.com/JonathSpirit
 
 <img src="images/TeraTerm.png" alt="TeraTerm" width="400"/> <img src="images/board.jpeg" alt="board" width="400"/>
 
-## Status
+## Stats
 
-Version :
-> MM1_Writer_code revision 1
+![version](https://img.shields.io/badge/revision-MM1_Writer_code_R2-blue)
 
-Status :
-> Tested and working
+![bug](https://img.shields.io/github/issues/JonathSpirit/MM1_Writer_code/bug)\
+![fixed](https://img.shields.io/github/issues/JonathSpirit/MM1_Writer_code/fixed)
 
-Known issues :
-> (Empty)
+## Communication
+To communicate with the board you have to use a usb to uart bridge and connect every cable to the required pins (RX, TX, GND).
+
+The board is configured like so : 9600baud, no parity, 1 stop bit.
+
+Every command/response is in ascii. A command begin with '$' and must end with '#' (no line feed or carriage return).
+A response end with a line feed.
+
+Checksum is calculated by additioning every data byte (8bit).
+
+### Commands
+Here is the commands list (you can find more detail in the source code):
+
+Hello command, return hello
+| Command  | Response     |
+| -------- | ------------ |
+| [$H] [#] | [HELLO] [\n] |
+
+Info command, return code information\
+(every information in the response is separate with ':' and a '=' is used for arguement)
+| Command  | Response |
+| -------- | -------- |
+| [$I] [#] | ... [\n] |
+
+Write command, write data on the memory\
+(response can be WRITED, BAD_CHECKSUM etc...)
+| Command                                                               | Response |
+| --------------------------------------------------------------------- | -------- |
+| [$W] [Data checksum 8bit] [Start address 24bit] [n data 8bit] ... [#] | ... [\n] |
+
+Read command, read data on the memory
+| Command                                            | Response                                                                   |
+| -------------------------------------------------- | -------------------------------------------------------------------------- |
+| [$R] [Start address 24bit] [Num of data 24bit] [#] | [READED] [Data checksum 8bit] [Start address 24bit] [n data 8bit] ... [\n] |
+
+Memory model command (flash, eeprom etc...), return saved memory model\
+(0: eeprom, 1:flash, default: eeprom)
+| Command                | Response           |
+| ---------------------- | ------------------ |
+| [$M] [1 data 8bit] [#] | [1 data 8bit] [\n] |
+
+Flash erase sector command, return start and count
+| Command                                            | Response                                              |
+| -------------------------------------------------- | ----------------------------------------------------- |
+| [$FES] [Start sector 8bit] [Sector count 8bit] [#] | [ERASED] [Start sector 8bit] [Sector count 8bit] [\n] |

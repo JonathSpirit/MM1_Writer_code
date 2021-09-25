@@ -1,5 +1,26 @@
 /*
 Copyright 2021 Guillaume Guillet
+Licensed under MIT License
+Revision 2
+
+Code:  https://github.com/JonathSpirit/MM1_Writer_code
+Board: https://github.com/JonathSpirit/MM1_Writer
+*/
+
+/* CHANGELOG
+Revision 2:
+    - add cstring function to help
+        - add TransmitCString
+        - add CopyCStringToTransmitBuffer
+    - add macro BEGIN_TRANSMISSION_AND_WAIT
+    - add Uint24ToString
+    - read command now return the start address
+    - add $I command (info), that will return code information
+    - add flash memory compatibility
+    - add $M command to set memory model (flash, eeprom, etc...)
+
+Revision 1:
+    - Initial release
 */
 
 #include "main.h"
@@ -17,9 +38,12 @@ void main()
     unsigned char checksumCalculated;
     
     unsigned char numOfData;
+    unsigned char startSector;
     unsigned long startAddress;
     
     unsigned char buffRead;
+    
+    unsigned char memoryModel = MEMM_EEPROM;
     
     xdata unsigned char dataArray[100];
     
@@ -57,13 +81,134 @@ void main()
                     [HELLO][\n]
                     6 size
                     */
-                    _uart_transmitData[0] = 'H';
-                    _uart_transmitData[1] = 'E';
-                    _uart_transmitData[2] = 'L';
-                    _uart_transmitData[3] = 'L';
-                    _uart_transmitData[4] = 'O';
-                    _uart_transmitData[5] = '\n';
-                    _uart_transmitSize = 6;
+                    
+                    TransmitCString("HELLO\n");
+                }
+                else if ( !strncmp("$M", _uart_receiveData, 2) )
+                {//Memory model command (flash, eeprom etc...), return saved memory model
+                    /*
+                    [$M] [1 data 8bit] [#]
+                    3 size
+                    
+                    return
+                    [1 data 8bit] [\n]
+                    1 size
+                    */
+                    
+                    if (_uart_receiveSize == 3)
+                    {
+                        i = _uart_receiveData[2] - '0';
+                        if (i < _MEMM_SIZE)
+                        {
+                            memoryModel = i;
+                        }
+                        _uart_transmitSize = 2;
+                        _uart_transmitData[0] = memoryModel+'0';
+                        _uart_transmitData[1] = '\n';
+                        BEGIN_TRANSMISSION_AND_WAIT
+                    }
+                    else
+                    {
+                        /*
+                        return
+                        [BAD_SIZE][\n]
+                        9 size
+                        */
+                        TransmitCString("BAD_SIZE\n");
+                    }
+                }
+                else if ( !strncmp("$FES", _uart_receiveData, 4) )
+                {//Flash erase sector command, return start and count
+                    /*
+                    [$FES] [Start sector 8bit] [Sector count 8bit] [#]
+                    $FES   xxx                 xxx                 #
+                    4      3                   3
+                    10 size
+                    
+                    return
+                    [ERASED] [Start sector 8bit] [Sector count 8bit] [\n]
+                    12 size
+                    */
+                    
+                    if (_uart_receiveSize == 10)
+                    {
+                        numOfData = StringToUint8(_uart_receiveData+7);
+                        startSector = StringToUint8(_uart_receiveData+4);
+                        
+                        if (numOfData > 0)
+                        {
+                            if ( ((unsigned short)startSector) + numOfData <= 0xFF )
+                            {
+                                SetOutputEnable(1);
+                                
+                                for (i=0; i<numOfData; ++i)
+                                {
+                                    FlashEraseSector(startSector + i);
+                                }
+                                
+                                _uart_transmitSize = 0;
+                                CopyCStringToTransmitBuffer("ERASED");
+                                Uint8ToString(_uart_transmitData+_uart_transmitSize, startSector);
+                                _uart_transmitSize += 3;
+                                Uint8ToString(_uart_transmitData+_uart_transmitSize, numOfData);
+                                _uart_transmitSize += 3;
+                                _uart_transmitData[_uart_transmitSize++] = '\n';
+                                BEGIN_TRANSMISSION_AND_WAIT
+                            }
+                            else
+                            {
+                                /*
+                                return
+                                [BAD_SIZE][\n]
+                                9 size
+                                */
+                                TransmitCString("BAD_SIZE\n");
+                            }
+                        }
+                        else
+                        {
+                            /*
+                            return
+                            [BAD_SIZE][\n]
+                            9 size
+                            */
+                            TransmitCString("BAD_SIZE\n");
+                        }
+                    }
+                    else
+                    {
+                        /*
+                        return
+                        [BAD_SIZE][\n]
+                        9 size
+                        */
+                        TransmitCString("BAD_SIZE\n");
+                    }
+                }
+                else if ( !strncmp("$I", _uart_receiveData, _uart_receiveSize) )
+                {//Info command, return code information
+                    /*
+                    [$I][#]
+                    2 size
+                    
+                    return (every information is separate with ':' and a '=' is used for arguement)
+                    ... [\n]
+                    n size
+                    */
+                    
+                    _uart_transmitSize = 0;
+                    
+                    CopyCStringToTransmitBuffer("Name=MM1_Writer_code:REV=");
+                    Uint8ToString(_uart_transmitData+_uart_transmitSize, REVISION);
+                    _uart_transmitSize += 3;
+                    
+                    CopyCStringToTransmitBuffer(":CompileDate=");
+                    CopyCStringToTransmitBuffer(__DATE__);
+                    
+                    CopyCStringToTransmitBuffer(":CompileTime=");
+                    CopyCStringToTransmitBuffer(__TIME__);
+                    
+                    BEGIN_TRANSMISSION_AND_WAIT
                 }
                 else if ( !strncmp("$W", _uart_receiveData, 2) )
                 {//Write command, write data on the memory
@@ -97,11 +242,22 @@ void main()
                                     //Everything is ok ! Begin the writing !
                                     SetOutputEnable(1);
                     
-                                    for (i=0; i<numOfData; ++i)
+                                    switch (memoryModel)
                                     {
-                                        SetAddress(startAddress + i);
-                                        Write(dataArray[i]);
-                                        Sleep(20);
+                                    case MEMM_FLASH:
+                                        for (i=0; i<numOfData; ++i)
+                                        {
+                                            FlashByteProgram(startAddress + i, dataArray[i]);
+                                        }
+                                        break;
+                                    default:
+                                        for (i=0; i<numOfData; ++i)
+                                        {
+                                            SetAddress(startAddress + i);
+                                            Write(dataArray[i]);
+                                            Sleep(20);
+                                        }
+                                        break;
                                     }
                                     
                                     /*
@@ -109,8 +265,7 @@ void main()
                                     [WRITED][\n]
                                     7 size
                                     */
-                                    strcpy(_uart_transmitData, "WRITED\n");
-                                    _uart_transmitSize = 7;
+                                    TransmitCString("WRITED\n");
                                 }
                                 else
                                 {
@@ -119,8 +274,7 @@ void main()
                                     [BAD_CHECKSUM][\n]
                                     13 size
                                     */
-                                    strcpy(_uart_transmitData, "BAD_CHECKSUM\n");
-                                    _uart_transmitSize = 13;
+                                    TransmitCString("BAD_CHECKSUM\n");
                                 }
                             }
                             else
@@ -130,8 +284,7 @@ void main()
                                 [BAD_SIZE][\n]
                                 9 size
                                 */
-                                strcpy(_uart_transmitData, "BAD_SIZE\n");
-                                _uart_transmitSize = 9;
+                                TransmitCString("BAD_SIZE\n");
                             }
                         }
                         else
@@ -141,8 +294,7 @@ void main()
                             [BAD_SIZE][\n]
                             9 size
                             */
-                            strcpy(_uart_transmitData, "BAD_SIZE\n");
-                            _uart_transmitSize = 9;
+                            TransmitCString("BAD_SIZE\n");
                         }
                     }
                     else
@@ -152,8 +304,7 @@ void main()
                         [BAD_SIZE][\n]
                         9 size
                         */
-                        strcpy(_uart_transmitData, "BAD_SIZE\n");
-                        _uart_transmitSize = 9;
+                        TransmitCString("BAD_SIZE\n");
                     }
                 }
                 else if ( !strncmp("$R", _uart_receiveData, 2) )
@@ -165,10 +316,10 @@ void main()
                     18 size
                     
                     return
-                    [READED][Data checksum 8bit][n data 8bit] ... [\n]
-                    READED  xxx                 xxx           ... \n
-                    6       3                   n*3
-                    9+n*3 size
+                    [READED][Data checksum 8bit][Start address 24bit][n data 8bit] ... [\n]
+                    READED  xxx                 xxxxxxxx             xxx           ... \n
+                    6       3                   8                    n*3
+                    9+8+n*3 size
                     */
                     if (_uart_receiveSize == 18)
                     {
@@ -177,9 +328,11 @@ void main()
                         
                         if ( (numOfData<=100) && (numOfData!=0) && (startAddress+numOfData-1 <= 0x00FFFFFF) )
                         {//Check if arguments is good
+                            _uart_transmitSize = 0;
                             checksumCalculated = 0;
-                            strcpy(_uart_transmitData, "READEDxxx");
-                            ptr = _uart_transmitData+9;
+                            ptr = _uart_transmitData + CopyCStringToTransmitBuffer("READEDxxx");
+                            Uint24ToString(ptr, startAddress);
+                            ptr+=8;
                             
                             SetOutputEnable(0);
                             for (i=0; i<numOfData; ++i)
@@ -196,7 +349,8 @@ void main()
                             Uint8ToString(_uart_transmitData+6, checksumCalculated);
                             *ptr = '\n'; //lastChar;
                             
-                            _uart_transmitSize = 10+numOfData*3;
+                            _uart_transmitSize = 18+numOfData*3;
+                            BEGIN_TRANSMISSION_AND_WAIT
                         }
                         else
                         {
@@ -205,8 +359,7 @@ void main()
                             [BAD_SIZE][\n]
                             9 size
                             */
-                            strcpy(_uart_transmitData, "BAD_SIZE\n");
-                            _uart_transmitSize = 9;
+                            TransmitCString("BAD_SIZE\n");
                         }
                     }
                     else
@@ -216,8 +369,7 @@ void main()
                         [BAD_SIZE][\n]
                         9 size
                         */
-                        strcpy(_uart_transmitData, "BAD_SIZE\n");
-                        _uart_transmitSize = 9;
+                        TransmitCString("BAD_SIZE\n");
                     }
                 }
                 else
@@ -227,8 +379,7 @@ void main()
                     [UNKNOWN][\n]
                     8 size
                     */
-                    strcpy(_uart_transmitData, "UNKNOWN\n");
-                    _uart_transmitSize = 8;
+                    TransmitCString("UNKNOWN\n");
                 }
             }
             else
@@ -238,15 +389,10 @@ void main()
                 [BAD_SIZE][\n]
                 9 size
                 */
-                strcpy(_uart_transmitData, "BAD_SIZE\n");
-                _uart_transmitSize = 9;
+                TransmitCString("BAD_SIZE\n");
             }
             
             _uart_receiveFlag = 0;
-            
-            TI0 = 1;
-            _uart_transmitFlag = 0;
-            while (!_uart_transmitFlag);
         }
     }
 }
@@ -276,13 +422,23 @@ void Uint8ToString(unsigned char* str, unsigned char uint8)
     str[1] = (uint8%100)/10+'0';
     str[2] = (uint8%10)+'0';
 }
+void Uint24ToString(unsigned char* str, unsigned long uint24)
+{
+    //xx'xxx'xxx
+    unsigned char i;
+    
+    for (i=0; i<8; ++i)
+    {
+        str[7-i] = (uint24%10)+'0';
+        uint24 /= 10;
+    }
+}
 
 unsigned char StringToUint8(unsigned char* str)
 {
     //xxx
     return (str[0]-'0')*100 + (str[1]-'0')*10 + (str[2]-'0');
 }
-
 unsigned long StringToUint24(unsigned char* str)
 {
     //xx'xxx'xxx

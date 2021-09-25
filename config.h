@@ -1,5 +1,6 @@
 /*
 Copyright 2021 Guillaume Guillet
+Licensed under MIT License
 */
 
 #ifndef _CONFIG_H_INCLUDED_
